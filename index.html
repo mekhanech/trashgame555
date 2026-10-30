@@ -57,14 +57,14 @@ h1 small{display:block;font-size:.5em;color:#f4ecd8;text-shadow:0 2px 0 #4b1d0a;
 #fs.fight{top:auto;right:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 2vh);left:calc(50% + 58px);height:clamp(30px,8vh,44px)}
 #dp{display:grid!important;grid-template-columns:repeat(3,auto)}#ab .bs{grid-column:2}.bj{grid-column:3;background:linear-gradient(#5fe0d0,#1fa595 55%,#0f6a60)}
 .bw{background:linear-gradient(#9be36f,#4aa530 55%,#2a6a1a)}.bw.rdy{animation:pl .55s infinite alternate;border-color:#ffd75e}
-input{font:inherit;font-size:clamp(9px,2.4vh,13px);padding:1.4vh 1.5vw;border:3px solid #3b2f5c;border-radius:10px;background:#1a1330;color:#ffd75e;text-align:center;user-select:text;-webkit-user-select:text;touch-action:auto;max-width:60vw}input:focus{outline:none;border-color:#ffd75e}</style></head><body>
+input{font:inherit;font-size:clamp(9px,2.4vh,13px);padding:1.4vh 1.5vw;border:3px solid #3b2f5c;border-radius:10px;background:#1a1330;color:#ffd75e;text-align:center;user-select:text;-webkit-user-select:text;touch-action:auto;max-width:60vw}input:focus{outline:none;border-color:#ffd75e}.rl{display:flex;flex-direction:column;gap:1vh;max-height:24vh;overflow:auto;width:min(80vw,420px);touch-action:pan-y;font-size:clamp(7px,1.8vh,10px);color:#b9aad6;text-align:center}.rl .btn{font-size:clamp(7px,1.8vh,10px);padding:1vh 2vw}</style></head><body>
 <div id="app">
 <canvas id="c"></canvas>
 <button id="fs" title="Pantalla completa"><svg viewBox="0 0 24 24"><path d="M3 3h7v3H6v4H3zM21 3v7h-3V6h-4V3zM3 21v-7h3v4h4v3zM21 21h-7v-3h4v-4h3z"/></svg></button>
 
 <div id="pw" class="scr"><h1>Acceso<small>CONTRASEÑA</small></h1><input id="pwi" type="password" autocomplete="off" placeholder="Contraseña" maxlength="30"><button class="btn" id="pwb">Entrar</button><div class="sub" id="pwe"></div></div>
 <div id="modo" class="scr hide"><h1 style="font-size:clamp(11px,3.6vh,22px)">Elige el modo</h1><div class="row"><button class="btn" id="msolo">Solojugador</button><button class="btn alt" id="mmulti">Multijugador</button></div><div class="sub">Multijugador: juega online contra un amigo con un código de sala</div></div>
-<div id="lobby" class="scr hide"><h1 style="font-size:clamp(11px,3.6vh,22px)">Multijugador</h1><div class="row"><button class="btn" id="lhost">Crear sala</button><button class="btn alt" id="ljoin">Unirme</button></div><input id="lcode" placeholder="Código de sala" maxlength="6" style="text-transform:uppercase"><div class="sub" id="lmsg">Crea una sala y pasa el código, o escribe el código de tu amigo y pulsa Unirme</div><button class="btn alt" id="lback">Volver</button></div>
+<div id="lobby" class="scr hide"><h1 style="font-size:clamp(11px,3.6vh,22px)">Multijugador</h1><div class="row"><button class="btn" id="lhost">Crear sala</button><button class="btn alt" id="ljoin">Unirme</button></div><input id="lcode" placeholder="Código de sala" maxlength="6" style="text-transform:uppercase"><div class="sub">Salas públicas abiertas:</div><div class="rl" id="rl"></div><div class="sub" id="lmsg">Crea una sala y pasa el código, o escribe el código de tu amigo y pulsa Unirme</div><button class="btn alt" id="lback">Volver</button></div>
 <div id="title" class="scr hide">
 <h1>El Arte de la<br>Doma Clásica<br>de Pijes<small>TORNEO DE COMBATE</small></h1>
 <div class="row" id="trow"></div>
@@ -504,7 +504,7 @@ const send=m=>{try{conn&&conn.open&&conn.send(m)}catch(e){}};
 const hs=t=>{let h=7;for(const c of t)h=Math.imul(h^c.charCodeAt(0),2654435761)>>>0;return h};
 const lmsg=t=>$('#lmsg').textContent=t;
 function setMP(){$('#mp').style.display=NET.role==='guest'?'none':'';$('#fight').textContent=NET.role==='solo'?'Combatir':'Listo'}
-function closeNet(){try{conn&&conn.close();peer&&peer.destroy()}catch(e){}conn=peer=null;NET={role:'solo'};setMP()}
+function closeNet(){unreg();try{conn&&conn.close();peer&&peer.destroy()}catch(e){}conn=peer=null;NET={role:'solo'};setMP()}
 function toSel(){rdy={};G=null;setMP();scr('sel')}
 function endTxt(){$('#et').innerHTML=(NET.role==='guest'?G.wb>G.wa:G.wa>G.wb)?'¡Victoria!':'Derrota';if(NET.role==='host')snap()}
 function ready(){const me={id:sel,nm:pname||CH[sel].n};rdy.me=me;$('#fight').textContent='Esperando rival…';if(NET.role==='guest')send({t:'ready',id:me.id,nm:me.nm});else tryStart()}
@@ -530,10 +530,25 @@ $('#mmulti').onclick=()=>{lmsg('Crea una sala y pasa el código, o escribe el c�
 $('#lback').onclick=()=>{closeNet();scr('modo')};
 $('#lhost').onclick=()=>{if(!window.Peer)return lmsg('No cargó PeerJS: revisa tu conexión a internet');closeNet();
 const code=Array.from({length:5},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.random()*32|0]).join('');lmsg('Creando sala…');
-peer=new Peer('pijes-'+code);peer.on('open',()=>lmsg('Código de sala: '+code+' · esperando rival…'));peer.on('error',e=>lmsg('Error: '+(e.type||e)));
-peer.on('connection',c=>{if(conn){c.close();return}conn=c;c.on('open',()=>{NET={role:'host'};hook(c)})})};
+peer=new Peer('pijes-'+code);peer.on('open',()=>{lmsg('Código de sala: '+code+' · esperando rival…');regRoom(code)});peer.on('error',e=>lmsg('Error: '+(e.type||e)));
+peer.on('connection',c=>{if(conn){c.close();return}conn=c;unreg();c.on('open',()=>{NET={role:'host'};hook(c)})})};
 $('#ljoin').onclick=()=>{const code=$('#lcode').value.trim().toUpperCase();if(!code)return lmsg('Escribe el código de sala');if(!window.Peer)return lmsg('No cargó PeerJS: revisa tu conexión a internet');closeNet();lmsg('Conectando…');
 peer=new Peer();peer.on('error',e=>lmsg('Error: '+(e.type||e)));
 peer.on('open',()=>{const c=peer.connect('pijes-'+code,{reliable:true});conn=c;c.on('open',()=>{NET={role:'guest'};hook(c)})})};
+
+let dirP=null,isDir=false,dc=null,lp=null,rooms={},subs=new Set(),lobbyOn=0,myRoom=null;
+const rlist=()=>Object.values(rooms).map(r=>({code:r.code,name:r.name,map:r.map}));
+function renderRooms(l){const e=$('#rl');e.innerHTML='';if(!l.length){e.textContent='No hay salas abiertas ahora';return}l.forEach(r=>{const b=document.createElement('button');b.className='btn alt';b.textContent=r.name+' · '+r.map;b.onclick=()=>{$('#lcode').value=r.code;$('#ljoin').click()};e.appendChild(b)})}
+function pushRooms(){const l=rlist();renderRooms(l);subs.forEach(c=>{try{c.send({t:'rooms',l})}catch(e){}})}
+function dirMsg(m,c){if(m.t==='reg'){rooms[m.code]={code:m.code,name:m.name,map:m.map,c};pushRooms()}else if(m.t==='unreg'){delete rooms[m.code];pushRooms()}else if(m.t==='sub'&&c){subs.add(c);c.send({t:'rooms',l:rlist()})}}
+function dsend(m){if(isDir)dirMsg(m,null);else if(dc&&dc.open)dc.send(m)}
+function regRoom(code){myRoom={t:'reg',code,name:'Sala '+code,map:MAPS[mi][1]};dsend(myRoom)}
+function unreg(){if(myRoom){dsend({t:'unreg',code:myRoom.code});myRoom=null}}
+function joinDir(){lp=new Peer();lp.on('open',()=>{dc=lp.connect('pijes-directory',{reliable:true});dc.on('open',()=>{dc.send({t:'sub'});if(myRoom)dc.send(myRoom)});dc.on('data',m=>{if(m.t==='rooms')renderRooms(m.l)});dc.on('close',()=>{dc=null;try{lp.destroy()}catch(_){}lp=null;setTimeout(dirInit,1500)})});lp.on('error',()=>{try{lp.destroy()}catch(_){}lp=null;dc=null;setTimeout(dirInit,2500)})}
+function dirInit(){if(!lobbyOn||dirP||lp||!window.Peer)return;const p=new Peer('pijes-directory');dirP=p;
+p.on('open',()=>{isDir=true;if(myRoom)dirMsg(myRoom,null);renderRooms(rlist())});
+p.on('connection',c=>{c.on('data',m=>dirMsg(m,c));c.on('close',()=>{subs.delete(c);for(const k in rooms)if(rooms[k].c===c)delete rooms[k];pushRooms()})});
+p.on('error',e=>{if(e.type==='unavailable-id'){try{p.destroy()}catch(_){}dirP=null;joinDir()}})}
+{const m0=$('#mmulti').onclick;$('#mmulti').onclick=()=>{m0();lobbyOn=1;dirInit();renderRooms(rlist())}}
 
 </script><script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script></body></html>
