@@ -499,6 +499,7 @@ function tfs(){try{if(fsOn())(document.exitFullscreen||document.webkitExitFullsc
 $('#fs').addEventListener('click',tfs);$('#mp').onclick=()=>{mi=(mi+1)%MAPS.length;$('#mp').textContent='Mapa: '+MAPS[mi][1];beep(500,.05)};addEventListener('keydown',e=>{if(e.target.tagName!=='INPUT'&&(e.key==='f'||e.key==='F'))tfs()});
 requestAnimationFrame(loop);
 
+const PO={debug:1,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},{urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]}};
 let NET={role:'solo'},RI={l:0,r:0,b:0,d:0},RP={p:-99,k:-99,s:-99,u:-99,h:-99,w:-99},pname='',conn=null,peer=null,rdy={};
 const send=m=>{try{conn&&conn.open&&conn.send(m)}catch(e){}};
 const hs=t=>{let h=7;for(const c of t)h=Math.imul(h^c.charCodeAt(0),2654435761)>>>0;return h};
@@ -530,11 +531,11 @@ $('#mmulti').onclick=()=>{lmsg('Crea una sala y pasa el código, o escribe el c�
 $('#lback').onclick=()=>{closeNet();scr('modo')};
 $('#lhost').onclick=()=>{if(!window.Peer)return lmsg('No cargó PeerJS: revisa tu conexión a internet');closeNet();
 const code=Array.from({length:5},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.random()*32|0]).join('');lmsg('Creando sala…');
-peer=new Peer('pijes-'+code);peer.on('open',()=>{lmsg('Código de sala: '+code+' · esperando rival…');regRoom(code)});peer.on('error',e=>lmsg('Error: '+(e.type||e)));
-peer.on('connection',c=>{if(conn){c.close();return}conn=c;unreg();c.on('open',()=>{NET={role:'host'};hook(c)})})};
+peer=new Peer('pijes-'+code,PO);peer.on('open',()=>{lmsg('Código de sala: '+code+' · esperando rival…');regRoom(code)});peer.on('error',e=>lmsg('Error: '+(e.type||e)));
+peer.on('connection',c=>{if(conn&&conn.open){c.close();return}conn=c;unreg();c.on('error',e=>lmsg('Error de conexión: '+(e.type||e)));c.on('open',()=>{NET={role:'host'};hook(c)})})};
 $('#ljoin').onclick=()=>{const code=$('#lcode').value.trim().toUpperCase();if(!code)return lmsg('Escribe el código de sala');if(!window.Peer)return lmsg('No cargó PeerJS: revisa tu conexión a internet');closeNet();lmsg('Conectando…');
-peer=new Peer();peer.on('error',e=>lmsg('Error: '+(e.type||e)));
-peer.on('open',()=>{const c=peer.connect('pijes-'+code,{reliable:true});conn=c;c.on('open',()=>{NET={role:'guest'};hook(c)})})};
+peer=new Peer(undefined,PO);peer.on('error',e=>lmsg(e.type==='peer-unavailable'?'Esa sala ya no existe (revisa el código)':'Error: '+(e.type||e)));
+peer.on('open',()=>{const c=peer.connect('pijes-'+code,{reliable:true});conn=c;c.on('error',e=>lmsg('Error de conexión: '+(e.type||e)));c.on('open',()=>{NET={role:'guest'};hook(c)});setTimeout(()=>{if(NET.role!=='guest')lmsg('No se pudo conectar (estado: '+(c.peerConnection?c.peerConnection.iceConnectionState:'sin respuesta')+'). Prueba con otro wifi/datos o crea una sala nueva.')},15000)})};
 
 let dirP=null,isDir=false,dc=null,lp=null,rooms={},subs=new Set(),lobbyOn=0,myRoom=null;
 const rlist=()=>Object.values(rooms).map(r=>({code:r.code,name:r.name,map:r.map}));
@@ -544,8 +545,8 @@ function dirMsg(m,c){if(m.t==='reg'){rooms[m.code]={code:m.code,name:m.name,map:
 function dsend(m){if(isDir)dirMsg(m,null);else if(dc&&dc.open)dc.send(m)}
 function regRoom(code){myRoom={t:'reg',code,name:'Sala '+code,map:MAPS[mi][1]};dsend(myRoom)}
 function unreg(){if(myRoom){dsend({t:'unreg',code:myRoom.code});myRoom=null}}
-function joinDir(){lp=new Peer();lp.on('open',()=>{dc=lp.connect('pijes-directory',{reliable:true});dc.on('open',()=>{dc.send({t:'sub'});if(myRoom)dc.send(myRoom)});dc.on('data',m=>{if(m.t==='rooms')renderRooms(m.l)});dc.on('close',()=>{dc=null;try{lp.destroy()}catch(_){}lp=null;setTimeout(dirInit,1500)})});lp.on('error',()=>{try{lp.destroy()}catch(_){}lp=null;dc=null;setTimeout(dirInit,2500)})}
-function dirInit(){if(!lobbyOn||dirP||lp||!window.Peer)return;const p=new Peer('pijes-directory');dirP=p;
+function joinDir(){lp=new Peer(undefined,PO);lp.on('open',()=>{dc=lp.connect('pijes-directory',{reliable:true});dc.on('open',()=>{dc.send({t:'sub'});if(myRoom)dc.send(myRoom)});dc.on('data',m=>{if(m.t==='rooms')renderRooms(m.l)});dc.on('close',()=>{dc=null;try{lp.destroy()}catch(_){}lp=null;setTimeout(dirInit,1500)})});lp.on('error',()=>{try{lp.destroy()}catch(_){}lp=null;dc=null;setTimeout(dirInit,2500)})}
+function dirInit(){if(!lobbyOn||dirP||lp||!window.Peer)return;const p=new Peer('pijes-directory',PO);dirP=p;
 p.on('open',()=>{isDir=true;if(myRoom)dirMsg(myRoom,null);renderRooms(rlist())});
 p.on('connection',c=>{c.on('data',m=>dirMsg(m,c));c.on('close',()=>{subs.delete(c);for(const k in rooms)if(rooms[k].c===c)delete rooms[k];pushRooms()})});
 p.on('error',e=>{if(e.type==='unavailable-id'){try{p.destroy()}catch(_){}dirP=null;joinDir()}})}
