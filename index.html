@@ -64,7 +64,7 @@ input{font:inherit;font-size:clamp(9px,2.4vh,13px);padding:1.4vh 1.5vw;border:3p
 
 <div id="pw" class="scr"><h1>Acceso<small>CONTRASEÑA</small></h1><input id="pwi" type="password" autocomplete="off" placeholder="Contraseña" maxlength="30"><button class="btn" id="pwb">Entrar</button><div class="sub" id="pwe"></div></div>
 <div id="modo" class="scr hide"><h1 style="font-size:clamp(11px,3.6vh,22px)">Elige el modo</h1><div class="row"><button class="btn" id="msolo">Solojugador</button><button class="btn alt" id="mmulti">Multijugador</button></div><div class="sub">Multijugador: juega online contra un amigo con un código de sala</div></div>
-<div id="lobby" class="scr hide"><h1 style="font-size:clamp(11px,3.6vh,22px)">Multijugador</h1><div class="row"><button class="btn" id="lhost">Crear sala</button><button class="btn alt" id="ljoin">Unirme</button></div><input id="lcode" placeholder="Código de sala" maxlength="6" style="text-transform:uppercase"><div class="sub">Salas públicas abiertas:</div><div class="rl" id="rl"></div><div class="sub" id="lmsg">Crea una sala y pasa el código, o escribe el código de tu amigo y pulsa Unirme</div><button class="btn alt" id="lback">Volver</button></div>
+<div id="lobby" class="scr hide"><h1 style="font-size:clamp(11px,3.6vh,22px)">Multijugador</h1><div class="row"><button class="btn" id="lhost">Crear sala</button><button class="btn alt" id="ljoin">Unirme</button></div><input id="lcode" placeholder="Código de sala" maxlength="6" style="text-transform:uppercase"><div class="sub">Salas públicas abiertas:</div><div class="rl" id="rl"></div><div class="sub" id="dst"></div><div class="sub" id="lmsg">Crea una sala y pasa el código, o escribe el código de tu amigo y pulsa Unirme</div><button class="btn alt" id="lback">Volver</button></div>
 <div id="title" class="scr hide">
 <h1>El Arte de la<br>Doma Clásica<br>de Pijes<small>TORNEO DE COMBATE</small></h1>
 <div class="row" id="trow"></div>
@@ -537,6 +537,7 @@ $('#ljoin').onclick=()=>{const code=$('#lcode').value.trim().toUpperCase();if(!c
 peer=new Peer(undefined,PO);peer.on('error',e=>lmsg(e.type==='peer-unavailable'?'Esa sala ya no existe (revisa el código)':'Error: '+(e.type||e)));
 peer.on('open',()=>{const c=peer.connect('pijes-'+code,{reliable:true});conn=c;c.on('error',e=>lmsg('Error de conexión: '+(e.type||e)));c.on('open',()=>{NET={role:'guest'};hook(c)});setTimeout(()=>{if(NET.role!=='guest')lmsg('No se pudo conectar (estado: '+(c.peerConnection?c.peerConnection.iceConnectionState:'sin respuesta')+'). Prueba con otro wifi/datos o crea una sala nueva.')},15000)})};
 
+const ds=t=>{const e=$('#dst');if(e)e.textContent='v3 · '+t};
 let dirP=null,isDir=false,dc=null,lp=null,rooms={},subs=new Set(),lobbyOn=0,myRoom=null;
 const rlist=()=>Object.values(rooms).map(r=>({code:r.code,name:r.name,map:r.map}));
 function renderRooms(l){const e=$('#rl');e.innerHTML='';if(!l.length){e.textContent='No hay salas abiertas ahora';return}l.forEach(r=>{const b=document.createElement('button');b.className='btn alt';b.textContent=r.name+' · '+r.map;b.onclick=()=>{$('#lcode').value=r.code;$('#ljoin').click()};e.appendChild(b)})}
@@ -545,11 +546,10 @@ function dirMsg(m,c){if(m.t==='reg'){rooms[m.code]={code:m.code,name:m.name,map:
 function dsend(m){if(isDir)dirMsg(m,null);else if(dc&&dc.open)dc.send(m)}
 function regRoom(code){myRoom={t:'reg',code,name:'Sala '+code,map:MAPS[mi][1]};dsend(myRoom)}
 function unreg(){if(myRoom){dsend({t:'unreg',code:myRoom.code});myRoom=null}}
-function joinDir(){lp=new Peer(undefined,PO);lp.on('open',()=>{dc=lp.connect('pijes-directory',{reliable:true});dc.on('open',()=>{dc.send({t:'sub'});if(myRoom)dc.send(myRoom)});dc.on('data',m=>{if(m.t==='rooms')renderRooms(m.l)});dc.on('close',()=>{dc=null;try{lp.destroy()}catch(_){}lp=null;setTimeout(dirInit,1500)})});lp.on('error',()=>{try{lp.destroy()}catch(_){}lp=null;dc=null;setTimeout(dirInit,2500)})}
-function dirInit(){if(!lobbyOn||dirP||lp||!window.Peer)return;const p=new Peer('pijes-directory',PO);dirP=p;
-p.on('open',()=>{isDir=true;if(myRoom)dirMsg(myRoom,null);renderRooms(rlist())});
+function joinDir(){ds('buscando la lista…');lp=new Peer(undefined,PO);lp.on('open',()=>{dc=lp.connect('pijes-directory',{reliable:true});dc.on('open',()=>{ds('lista conectada');dc.send({t:'sub'});if(myRoom)dc.send(myRoom)});dc.on('data',m=>{if(m.t==='rooms')renderRooms(m.l)});dc.on('close',()=>{ds('lista desconectada, reintentando…');dc=null;try{lp.destroy()}catch(_){}lp=null;setTimeout(dirInit,1500)})});lp.on('error',()=>{ds('sin conexión con la lista, reintentando…');try{lp.destroy()}catch(_){}lp=null;dc=null;setTimeout(dirInit,2500)})}
+function dirInit(){if(!window.Peer)return ds('PeerJS no cargó (revisa internet)');if(!lobbyOn||dirP||lp)return;ds('conectando a la lista…');const p=new Peer('pijes-directory',PO);dirP=p;
+p.on('open',()=>{ds('lista activa (tú la guardas)');isDir=true;if(myRoom)dirMsg(myRoom,null);renderRooms(rlist())});
 p.on('connection',c=>{c.on('data',m=>dirMsg(m,c));c.on('close',()=>{subs.delete(c);for(const k in rooms)if(rooms[k].c===c)delete rooms[k];pushRooms()})});
 p.on('error',e=>{if(e.type==='unavailable-id'){try{p.destroy()}catch(_){}dirP=null;joinDir()}})}
 {const m0=$('#mmulti').onclick;$('#mmulti').onclick=()=>{m0();lobbyOn=1;dirInit();renderRooms(rlist())}}
 
-</script><script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script></body></html>
